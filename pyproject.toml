@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "svi-lab"
+version = "0.1.0"
+description = "Fit arbitrage-checked SVI volatility smiles to real option chains, refreshed daily"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Oscar Caudreliez" }]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "pandas>=2.0",
+    "yfinance>=0.2.40",
+    "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "ruff>=0.4"]
+
+[project.urls]
+Homepage = "https://github.com/0scarito/svi-lab"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/svi_lab"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "NPY", "UP"]
