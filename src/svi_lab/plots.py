@@ -8,7 +8,12 @@ from .surface import FittedSurface
 from .svi import svi_total_variance
 
 
-def plot_smile_grid(surface: FittedSurface, save_path: str) -> None:
+def plot_smile_grid(surface: FittedSurface, save_path: str, ssvi=None) -> None:
+    """Market quotes vs raw-SVI fits, with an optional arbitrage-free SSVI overlay.
+
+    ``ssvi`` is an ``SSVIFit`` whose slices are index-aligned with
+    ``surface.slices`` (both sorted by maturity).
+    """
     import matplotlib
 
     matplotlib.use("Agg")
@@ -20,18 +25,24 @@ def plot_smile_grid(surface: FittedSurface, save_path: str) -> None:
     fig, axes = plt.subplots(rows, cols, figsize=(13, 3.6 * rows), squeeze=False)
     for ax in axes.flat[n:]:
         ax.axis("off")
-    for ax, s, f in zip(axes.flat, surface.slices, surface.fits):
+    for i, (ax, s, f) in enumerate(zip(axes.flat, surface.slices, surface.fits)):
         iv_mkt = np.sqrt(s.w / s.t_years)
         grid = np.linspace(s.k.min(), s.k.max(), 200)
         iv_fit = np.sqrt(svi_total_variance(grid, f.params) / s.t_years)
         ax.scatter(s.k, iv_mkt, s=14, color="#1f6feb", alpha=0.7, label="market")
-        ax.plot(grid, iv_fit, color="#39d353", lw=2, label="SVI fit")
+        ax.plot(grid, iv_fit, color="#39d353", lw=2, label="raw SVI (slice-wise)")
+        if ssvi is not None:
+            iv_ssvi = np.sqrt(
+                np.maximum(svi_total_variance(grid, ssvi.slice_params(i)), 1e-12) / s.t_years
+            )
+            ax.plot(grid, iv_ssvi, color="#f0883e", lw=1.8, ls="--", label="SSVI (no-arb)")
         flag = "" if f.butterfly_arbitrage_free else "  [BUTTERFLY ARB]"
         ax.set_title(f"{s.expiry}  (T={s.t_years:.2f}y, g_min={f.g_min:+.3f}){flag}", fontsize=9)
         ax.set_xlabel("log-moneyness k")
         ax.set_ylabel("implied vol")
         ax.legend(fontsize=8)
-    fig.suptitle(f"{surface.ticker} implied-vol smiles vs raw-SVI fits — {surface.asof}")
+    subtitle = "raw-SVI fits" if ssvi is None else "raw-SVI vs arbitrage-free SSVI"
+    fig.suptitle(f"{surface.ticker} implied-vol smiles: {subtitle} — {surface.asof}")
     fig.tight_layout()
     fig.savefig(save_path, dpi=130)
     plt.close(fig)
