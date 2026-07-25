@@ -17,6 +17,7 @@ For each listed expiry (7–400 days out):
 3. **Fits raw SVI** total variance w(k) = a + b(ρ(k−m) + √((k−m)² + σ²)) by bounded least squares from multiple starts (raw SVI is notoriously multi-modal).
 4. **Checks static arbitrage** — the Gatheral–Jacquier g-function (butterfly) with *analytic* SVI derivatives, and total-variance monotonicity across expiries (calendar).
 5. **Calibrates SSVI on top** — one global (ρ, η, γ) plus the observed ATM total-variance term structure, **arbitrage-free by construction** (see below). The nightly snapshot carries both fits; the smile chart overlays them.
+6. **Extracts the risk-neutral density** — the Breeden–Litzenberger density in closed form, straight out of the same g-function (see [Risk-neutral density](#risk-neutral-density)).
 
 A real snapshot (2026-07-03) — note the diagnostics doing their job:
 
@@ -42,6 +43,29 @@ Two constraints are enforced *inside* the optimizer, not checked after:
 
 Verification is shared, not duplicated: every SSVI slice is converted to raw-SVI parameters via the paper's Lemma 3.1 (a = θ(1−ρ²)/2, b = θφ/2, m = −ρ/φ, σ = √(1−ρ²)/φ) and pushed through the **same g-function** used to flag the raw fits. A hostile-data test generates quotes *outside* the arb-free zone and asserts the fit still returns a bound-respecting, statically-arbitrage-free surface — worse RMSE, never arbitrage. The trade is explicit: 3 parameters versus 5 per expiry means SSVI fits each smile a little worse than raw SVI; the comparison table in `data/latest.json` (refreshed nightly) shows both, per expiry.
 
+## Risk-neutral density
+
+Since v0.3.0 the lab reads the **implied risk-neutral density** straight off each fitted smile. Breeden & Litzenberger (1978) say the density is the (undiscounted) second strike-derivative of the call price; Gatheral (2006, *The Volatility Surface*) gives the closed form directly from an SVI slice, so it falls out of the machinery already built — **no numerical differentiation of noisy quotes**:
+
+`p(k) = g(k) / √(2π·w(k)) · exp(−d₋(k)²/2)`,  with  `d₋(k) = −k/√w − √w/2`,
+
+in log-return `k = ln(Sₜ/F)`. The `g(k)` here is *the exact same* `g_function` the butterfly test uses — reused verbatim, not reimplemented. That makes the equivalence concrete: `p` integrates to one over the real line by construction, and it is a **valid (non-negative) density iff `g(k) ≥ 0` everywhere** — i.e. iff the slice is butterfly-arbitrage-free. Arbitrage-free smile, valid density integrating to 1, and `g_min ≥ 0` are three names for one fact; a dip below zero on the chart is the very same thing `[BUTTERFLY ARB]` flags on the smile grid.
+
+![Implied risk-neutral densities](charts/densities.png)
+
+```python
+import json, numpy as np
+from svi_lab import SVIParams, density_stats, risk_neutral_density
+
+params = SVIParams(**json.load(open("data/latest.json"))["slices"][0]["params"])
+k = np.linspace(-3, 3, 3001)
+mass, mean, var = density_stats(k, params)
+print(f"mass={mass:.4f}  mean={mean:+.4f}  var={var:.4f}")   # mass=1.0000  mean=-0.0003  var=0.0006
+print(f"peak={risk_neutral_density(k, params).max():.2f}")   # peak=18.57  (front SPY expiry, 2026-07-25)
+```
+
+`density_stats` returns `(total_mass, mean, variance)` by trapezoid integration; `slice_density(k, fit[, i])` takes a fitted `SliceFit` or `SSVIFit` directly. On the live 2026-07-25 SPY snapshot every expiry integrated to 1.0000 for both parameterizations — the arbitrage-free SSVI densities (dashed) are visibly more peaked than the raw fits (3 global parameters vs 5 per expiry), the same fit-for-consistency trade, now read off the density.
+
 ## Install & run
 
 ```sh
@@ -64,6 +88,7 @@ pytest                            # network-free test suite
 - **Yahoo implied vols** are indicative, especially short-dated and far OTM — this is a lab, not a pricing service. Yahoo also intermittently serves degenerate chains (observed live: 2 thin expiries instead of 8); the refresh script now refuses to overwrite a good snapshot in that case.
 - **Raw fits are slice-wise** — they diagnose butterfly/calendar arbitrage but don't prevent it. That's now by design: they're the honest benchmark the arbitrage-free SSVI fit is compared against.
 - **SSVI trades fit for consistency**: 3 global parameters vs 5 per expiry, so per-slice RMSE is worse than raw SVI — the nightly comparison table quantifies exactly how much. θₜ comes from interpolating noisy ATM quotes (isotonic-projected), not from a term-structure model.
+- **The density is only as good as the fit.** `risk_neutral_density` is a closed-form transform of the SVI slice, so it inherits every flaw of the fit: front-month smiles are the noisiest, and when a slice fails the butterfly test the "density" genuinely goes negative there (surfaced, not hidden). Its **tails are pure SVI linear-wing extrapolation** — where there are no quotes, the density decays at whatever rate `b(1±ρ)` implies, not at a rate the market told you; treat far-strike density as a model artefact. Total mass drifting from 1 on a wide grid is the built-in warning light.
 - **`a ≥ 0` constraint** (raw fits): slightly stronger than Gatheral's minimal condition, guarantees positive variance at a small cost in wing flexibility.
 - Forward uses r ≈ 0; fine at these tenors, wrong for multi-year LEAPS.
 
@@ -77,5 +102,7 @@ pytest                            # network-free test suite
 
 - Gatheral (2004), *A parsimonious arbitrage-free implied volatility parametrization with application to the valuation of volatility derivatives*.
 - Gatheral & Jacquier (2014), *Arbitrage-free SVI volatility surfaces*, Quantitative Finance 14(1).
+- Breeden & Litzenberger (1978), *Prices of State-Contingent Claims Implicit in Option Prices*, Journal of Business 51(4).
+- Gatheral (2006), *The Volatility Surface: A Practitioner's Guide*, Wiley — SVI closed-form risk-neutral density.
 
 MIT © Oscar Caudreliez

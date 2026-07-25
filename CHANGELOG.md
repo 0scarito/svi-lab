@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.3.0 — 2026-07-25
+
+- **Risk-neutral density extraction** (`svi_lab.density`) — the
+  Breeden-Litzenberger (1978) density in closed form via Gatheral (2006):
+  `p(k) = g(k)/sqrt(2π·w(k))·exp(-d₋(k)²/2)`, `d₋(k) = -k/√w - √w/2`. It reuses
+  the **exact same `g_function`** that flags butterfly arbitrage — no new math,
+  no numerical differentiation of noisy quotes. An arbitrage-free smile and a
+  valid density integrating to one are the same statement, so `g(k) ≥ 0`
+  everywhere ⇔ `p(k) ≥ 0` everywhere ⇔ mass ≈ 1.
+- `risk_neutral_density(k, params)` works for any `SVIParams` — raw slice fits
+  and SSVI slices (via `ssvi_slice_params` / `SSVIFit.slice_params`) alike.
+  `density_stats(k_grid, params)` returns `(total_mass, mean, variance)` by
+  trapezoid integration; `slice_density(k, fit[, i])` dispatches on `SliceFit`
+  vs `SSVIFit`.
+- `plots.plot_densities()` draws each expiry's implied density over
+  log-moneyness (raw SVI + arbitrage-free SSVI overlay); `scripts/refresh.py`
+  now writes `charts/densities.png` and a per-slice mass table into
+  `data/latest.json`. Live 2026-07-25 SPY snapshot: all 8 expiries integrate to
+  1.0000 (raw and SSVI), every slice butterfly-free.
+- 27 tests (7 new): integrates-to-one on a benign slice, non-negativity where
+  g ≥ 0, the Black-Scholes lognormal limit as b → 0 (density → N(-w₀/2, w₀) to
+  1e-3), finite mean / positive variance, the negative-density flip side on an
+  arbitrageable slice, and SSVI slice densities integrating to one through the
+  shared machinery.
+
 ## 0.2.0 — 2026-07-21
 
 - **SSVI surface calibration** (`svi_lab.ssvi`) — Gatheral & Jacquier (2014)

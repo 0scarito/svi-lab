@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "svi-lab"
-version = "0.1.0"
+version = "0.3.0"
 description = "Fit arbitrage-checked SVI volatility smiles to real option chains, refreshed daily"
 readme = "README.md"
 license = { file = "LICENSE" }
