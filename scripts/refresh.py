@@ -1,7 +1,8 @@
 """Daily refresh: fetch the chain, fit raw SVI + arbitrage-free SSVI, write snapshot.
 
 Run:  python scripts/refresh.py [TICKER]
-Writes data/latest.json, charts/smiles.png, charts/surface.png, charts/densities.png.
+Writes data/latest.json, charts/smiles.png, charts/surface.png,
+charts/densities.png, charts/localvol.png.
 """
 
 import json
@@ -13,7 +14,12 @@ import numpy as np
 
 from svi_lab import check_static_arbitrage, fetch_slices, fit_ssvi, fit_surface
 from svi_lab.density import density_stats
-from svi_lab.plots import plot_densities, plot_smile_grid, plot_surface_3d
+from svi_lab.plots import (
+    plot_densities,
+    plot_local_vol,
+    plot_smile_grid,
+    plot_surface_3d,
+)
 from svi_lab.svi import calendar_violations, g_function
 
 # Wide, fine log-moneyness grid for the Breeden-Litzenberger mass check: an
@@ -102,8 +108,9 @@ def main() -> int:
     plot_smile_grid(surface, str(ROOT / "charts" / "smiles.png"), ssvi=ssvi)
     plot_surface_3d(surface, str(ROOT / "charts" / "surface.png"))
     plot_densities(surface, str(ROOT / "charts" / "densities.png"), ssvi=ssvi)
+    plot_local_vol(ssvi, str(ROOT / "charts" / "localvol.png"))
     print("wrote data/latest.json, charts/smiles.png, charts/surface.png, "
-          "charts/densities.png")
+          "charts/densities.png, charts/localvol.png")
     return 0
 
 

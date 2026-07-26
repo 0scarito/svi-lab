@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.0 — 2026-07-26
+
+- **Dupire local volatility** (`svi_lab.localvol`) — the local-vol surface from
+  the fitted SSVI surface via Gatheral (2006): `v_L(k,t) = (∂w/∂t) / g(k)`. The
+  denominator is the **exact same `g_function`** the lab already uses for the
+  butterfly test, so the two arbitrage checks it runs are precisely the
+  conditions for a valid local-vol surface: `g(k) > 0` (butterfly ⇒ positive
+  denominator) and `∂w/∂t > 0` (calendar ⇒ positive numerator). Local variance
+  is non-negative exactly on the arbitrage-free region — the same statement seen
+  a third way, after the smile fit and the risk-neutral density.
+- `local_variance(fit, k, t)` returns `(v_L, ∂w/∂t, g)`; `local_vol(...)` the
+  volatility; `local_vol_surface(...)` a `(k, t)` grid. `∂w/∂t` is a central
+  finite difference in `t` held inside the fitted maturity range; `θ_t` is
+  interpolated across the fitted expiries (monotone, so `dθ/dt ≥ 0`).
+- `plots.plot_local_vol()` renders the local-vol heatmap; `scripts/refresh.py`
+  now writes `charts/localvol.png`.
+- 33 tests (6 new): the flat-smile / linear-variance case recovers implied vol
+  exactly; the Dupire denominator equals `g_function` to 1e-12 (the reuse claim,
+  as a test); local variance is non-negative on an arbitrage-free fit; a
+  negative-ρ surface gives an asymmetric (downward-skewed) local vol.
+
 ## 0.3.0 — 2026-07-25
 
 - **Risk-neutral density extraction** (`svi_lab.density`) — the

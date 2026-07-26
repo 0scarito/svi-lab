@@ -118,3 +118,29 @@ def plot_densities(surface: FittedSurface, save_path: str, ssvi=None) -> None:
     fig.tight_layout()
     fig.savefig(save_path, dpi=130)
     plt.close(fig)
+
+
+def plot_local_vol(ssvi, save_path: str) -> None:
+    """Dupire local-volatility surface implied by the fitted SSVI surface.
+
+    Local variance v_L(k, t) = (dw/dt) / g(k) reuses the exact butterfly
+    g-function; this heatmap over (log-moneyness, maturity) is the third view
+    of the same fit, after the smile and the risk-neutral density.
+    """
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from .localvol import local_vol_surface
+
+    k_grid, t_grid, surf = local_vol_surface(ssvi, n_k=80, n_t=40)
+    fig, ax = plt.subplots(figsize=(9, 5.5))
+    im = ax.pcolormesh(k_grid, t_grid, surf, cmap="magma", shading="auto")
+    fig.colorbar(im, ax=ax, label="local volatility")
+    ax.set_xlabel("log-moneyness k")
+    ax.set_ylabel("maturity (years)")
+    ax.set_title("Dupire local-vol surface from SSVI  (v_L = dw/dt / g)")
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=130)
+    plt.close(fig)

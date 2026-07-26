@@ -18,6 +18,7 @@ For each listed expiry (7–400 days out):
 4. **Checks static arbitrage** — the Gatheral–Jacquier g-function (butterfly) with *analytic* SVI derivatives, and total-variance monotonicity across expiries (calendar).
 5. **Calibrates SSVI on top** — one global (ρ, η, γ) plus the observed ATM total-variance term structure, **arbitrage-free by construction** (see below). The nightly snapshot carries both fits; the smile chart overlays them.
 6. **Extracts the risk-neutral density** — the Breeden–Litzenberger density in closed form, straight out of the same g-function (see [Risk-neutral density](#risk-neutral-density)).
+7. **Builds the local-vol surface** — Dupire's `v_L = (∂w/∂t) / g(k)`, dividing by that same g-function again (see [Local volatility](#local-volatility)).
 
 A real snapshot (2026-07-03) — note the diagnostics doing their job:
 
@@ -66,6 +67,27 @@ print(f"peak={risk_neutral_density(k, params).max():.2f}")   # peak=18.57  (fron
 
 `density_stats` returns `(total_mass, mean, variance)` by trapezoid integration; `slice_density(k, fit[, i])` takes a fitted `SliceFit` or `SSVIFit` directly. On the live 2026-07-25 SPY snapshot every expiry integrated to 1.0000 for both parameterizations — the arbitrage-free SSVI densities (dashed) are visibly more peaked than the raw fits (3 global parameters vs 5 per expiry), the same fit-for-consistency trade, now read off the density.
 
+## Local volatility
+
+Since v0.4.0 the lab also reads the **Dupire local-volatility surface** off the SSVI fit. Gatheral (2006) writes local variance in total-implied-variance terms as
+
+`v_L(k, t) = (∂w/∂t) / g(k)`,
+
+and — for the third time — the denominator `g(k)` is *the exact same butterfly function* (`local_variance` returns it, and a test asserts it equals `g_function` to 1e-12). That makes the whole no-arbitrage story fall into place in one line: **the two checks the lab already runs are precisely the conditions for a valid local-vol surface.** `g(k) > 0` (butterfly) keeps the denominator positive; `∂w/∂t > 0` (calendar) keeps the numerator positive; so local variance is non-negative *exactly* on the arbitrage-free region. Smile fit → risk-neutral density → local vol are three transforms of one surface, all gated by the same `g`.
+
+![Dupire local-vol surface](charts/localvol.png)
+
+```python
+import numpy as np
+from svi_lab import fetch_slices, fit_ssvi, local_vol
+
+ssvi = fit_ssvi(fetch_slices("SPY"))
+k = np.linspace(-0.3, 0.3, 25)
+print(local_vol(ssvi, k, t=0.25))   # local vol across log-moneyness at 3M
+```
+
+`∂w/∂t` is a central finite difference in maturity, held inside the fitted range; `θₜ` is interpolated across the fitted expiries (monotone after the isotonic projection, so `dθ/dt ≥ 0`). A flat smile with total variance linear in `t` returns local vol == implied vol — the sanity check the tests pin.
+
 ## Install & run
 
 ```sh
@@ -89,6 +111,7 @@ pytest                            # network-free test suite
 - **Raw fits are slice-wise** — they diagnose butterfly/calendar arbitrage but don't prevent it. That's now by design: they're the honest benchmark the arbitrage-free SSVI fit is compared against.
 - **SSVI trades fit for consistency**: 3 global parameters vs 5 per expiry, so per-slice RMSE is worse than raw SVI — the nightly comparison table quantifies exactly how much. θₜ comes from interpolating noisy ATM quotes (isotonic-projected), not from a term-structure model.
 - **The density is only as good as the fit.** `risk_neutral_density` is a closed-form transform of the SVI slice, so it inherits every flaw of the fit: front-month smiles are the noisiest, and when a slice fails the butterfly test the "density" genuinely goes negative there (surfaced, not hidden). Its **tails are pure SVI linear-wing extrapolation** — where there are no quotes, the density decays at whatever rate `b(1±ρ)` implies, not at a rate the market told you; treat far-strike density as a model artefact. Total mass drifting from 1 on a wide grid is the built-in warning light.
+- **Local vol is built on SSVI and a finite-difference `∂w/∂t`.** The calendar derivative comes from central-differencing the fitted SSVI surface across an interpolated ATM term structure, not from a dense continuum of expiries — so `v_L` is smooth-by-construction between the fitted maturities and says nothing outside them (queries are clamped to the fitted range). It is a diagnostic read of the fitted surface, not an independently-calibrated local-vol model, and it inherits the SSVI-vs-raw fit gap.
 - **`a ≥ 0` constraint** (raw fits): slightly stronger than Gatheral's minimal condition, guarantees positive variance at a small cost in wing flexibility.
 - Forward uses r ≈ 0; fine at these tenors, wrong for multi-year LEAPS.
 
@@ -102,6 +125,8 @@ pytest                            # network-free test suite
 
 - Gatheral (2004), *A parsimonious arbitrage-free implied volatility parametrization with application to the valuation of volatility derivatives*.
 - Gatheral & Jacquier (2014), *Arbitrage-free SVI volatility surfaces*, Quantitative Finance 14(1).
+- Gatheral (2006), *The Volatility Surface: A Practitioner's Guide* — the SVI risk-neutral density and Dupire local-variance closed forms.
+- Breeden & Litzenberger (1978), *Prices of State-Contingent Claims Implicit in Option Prices*, Journal of Business 51(4).
 - Breeden & Litzenberger (1978), *Prices of State-Contingent Claims Implicit in Option Prices*, Journal of Business 51(4).
 - Gatheral (2006), *The Volatility Surface: A Practitioner's Guide*, Wiley — SVI closed-form risk-neutral density.
 

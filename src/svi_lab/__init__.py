@@ -2,6 +2,7 @@
 
 from .chain import ChainSlice, fetch_slices, parity_forward, slice_from_frames
 from .density import density_stats, risk_neutral_density, slice_density
+from .localvol import local_variance, local_vol, local_vol_surface
 from .ssvi import (
     SSVIFit,
     check_static_arbitrage,
@@ -21,7 +22,7 @@ from .svi import (
     svi_total_variance,
 )
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
     "ChainSlice",
@@ -37,6 +38,9 @@ __all__ = [
     "fit_surface",
     "fit_svi_slice",
     "g_function",
+    "local_variance",
+    "local_vol",
+    "local_vol_surface",
     "parity_forward",
     "phi_power_law",
     "risk_neutral_density",
