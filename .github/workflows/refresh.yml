@@ -1,8 +1,6 @@
 name: daily-refresh
 
 on:
-  schedule:
-    - cron: "45 21 * * 1-5"   # 21:45 UTC, after US close, weekdays
   workflow_dispatch:
 
 permissions:
